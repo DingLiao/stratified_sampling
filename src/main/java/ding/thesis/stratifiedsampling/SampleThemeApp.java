@@ -8,12 +8,13 @@ import ding.thesis.stratifiedsampling.util.DatabaseUtil;
 import ding.thesis.stratifiedsampling.util.Utils;
 
 
-public class App 
+public class SampleThemeApp 
 {
 	public static final int TOTAL = 1000000;
 	
     public static void main( String[] args )
     {
+    	long startTime =System.currentTimeMillis();
     	try{
 			Class.forName("com.mysql.jdbc.Driver");
 			System.out.println("Success loading Mysql Driver!");
@@ -25,39 +26,43 @@ public class App
 		try {
 			Connection connect = DriverManager.getConnection(DatabaseUtil.JDBC_URL,DatabaseUtil.USERNAME,DatabaseUtil.PASSWORD);
 			System.out.println("Success connect Mysql server!");
+			DatabaseUtil.dropSampleBucketTableIfExist(connect);
+			DatabaseUtil.createSampleBucketTableIfNotExist(connect);
 			
 			Item currentItem = DatabaseUtil.getNextValidItem(null, connect);
-			SampleBucket sb = new SampleBucket();
-			sb.setMax(currentItem.getLength());
-			sb.setMin(currentItem.getLength());
-			sb.setStartId(currentItem.getId());
-			sb.setEndId(currentItem.getId());
-			sb.setSampleSize(1);
+			SampleBucket currentSb = new SampleBucket();
+			currentSb.setMax(currentItem.getLength());
+			currentSb.setMin(currentItem.getLength());
+			currentSb.setStartId(currentItem.getId());
+			currentSb.setEndId(currentItem.getId());
+			currentSb.setSampleSize(1);
 			
 			int i = 1;
 			while(i< TOTAL) {
 				currentItem = DatabaseUtil.getNextValidItem(currentItem, connect);
-				int newSize = Utils.getNewSampleSize(currentItem.getLength(), sb);
-				if(sb.getSampleSize() + 1 >= newSize) {
-					sb.setSampleSize(newSize);
-					sb.setMax(Math.max(currentItem.getLength(), sb.getMax()));
-					sb.setEndId(currentItem.getId());
+				int newSize = Utils.getNewSampleSize(currentItem.getLength(), currentSb);
+				if(currentSb.getSampleSize() + 1 >= newSize) {
+					currentSb.setSampleSize(newSize);
+					currentSb.setMax(Math.max(currentItem.getLength(), currentSb.getMax()));
+					currentSb.setEndId(currentItem.getId());
 					System.out.println("Extend current sb: " + currentItem.toString() );
 				} else {
-					DatabaseUtil.insertSampleBucket(sb, connect);
-					System.out.println("Insert current sb: " + sb.toString() );
-					sb.setMax(currentItem.getLength());
-					sb.setMin(currentItem.getLength());
-					sb.setStartId(currentItem.getId());
-					sb.setEndId(currentItem.getId());
-					sb.setSampleSize(1);
+					DatabaseUtil.insertSampleBucket(currentSb, connect);
+					System.out.println("Insert current sb: " + currentSb.toString() );
+					currentSb.setMax(currentItem.getLength());
+					currentSb.setMin(currentItem.getLength());
+					currentSb.setStartId(currentItem.getId());
+					currentSb.setEndId(currentItem.getId());
+					currentSb.setSampleSize(1);
 					System.out.println("Create new sb with currentItem: " + currentItem.toString() );
 				}
 				i = currentItem.getId();
 			}
-			DatabaseUtil.insertSampleBucket(sb, connect);
+			DatabaseUtil.insertSampleBucket(currentSb, connect);
 			System.out.println("Insert current sb: " + currentItem.toString() );
 		    connect.close();
+		    long endTime = System.currentTimeMillis();
+		    System.out.println("Processing time: " + (endTime - startTime)/1000);
 		} catch(Exception e) {
 			System.out.println("get data error");
 			e.printStackTrace();
